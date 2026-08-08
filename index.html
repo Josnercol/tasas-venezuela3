@@ -624,55 +624,21 @@
     }
 
     // ─── Load Rates ──────────────────────────────────────────
-    // Consulta 4 fuentes en paralelo y elige la tasa más reciente por timestamp.
-    //
-    //  Fuente A: ve.dolarapi.com  → { promedio, fechaActualizacion }
-    //  Fuente B: bcv.today        → { USD, EUR, updated_at }
-    //  Fuente C: jsDelivr CDN     → respaldo de bcv.today
-    //  Binance:  criptoya.com     → { ask, bid }
-
-    const DOLARAPI_USD     = 'https://ve.dolarapi.com/v1/dolares/oficial';
-    const DOLARAPI_EUR     = 'https://ve.dolarapi.com/v1/euros/oficial';
-    const CRIPTOYA_BINANCE = 'https://criptoya.com/api/binancep2p/USDT/VES/100';
-    const BCV_API          = 'https://bcv.today/api/v1/rate.json';
-    const BCV_CDN          = 'https://cdn.jsdelivr.net/gh/grupoclip/bcv-api/api/v1/rate.json';
-
-    async function fetchJSON(url) {
-      const res = await fetch(url, { cache: 'no-store' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      return res.json();
-    }
-
-    // Devuelve el valor cuyo timestamp sea más reciente
-    function freshest(a, b) {
-      if (!a.val && !b.val) return null;
-      if (!a.val) return b.val;
-      if (!b.val) return a.val;
-      const tA = a.ts ? new Date(a.ts).getTime() : 0;
-      const tB = b.ts ? new Date(b.ts).getTime() : 0;
-      return tA >= tB ? a.val : b.val;
-    }
-
-    // BCV: desde rates.json generado por GitHub Action cada 30 min
-    // Binance: consulta directa (ya funcionaba sin problemas)
     async function loadRates() {
       const btn = document.getElementById('refreshBtn');
       btn.classList.add('loading');
       hideError();
 
       const [bcvRes, binRes] = await Promise.allSettled([
-        // BCV desde archivo estático — siempre fresco, sin CORS
+        // BCV desde archivo estático
         fetch('/rates.json?_=' + Date.now(), { cache: 'no-store' }).then(r => r.json()),
 
-// Binance a través de proxy CORS
-        fetch('https://corsproxy.io/?' + encodeURIComponent('https://p2p.binance.com/bapi/c2c/v5/friendly/c2c/search-single-page'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            asset: 'USDT', fiat: 'VES', merchantCheck: false,
-            page: 1, payTypes: [], publisherType: null, rows: 10, tradeType: 'BUY'
-          })
-        }).then(r => r.json()),
+        // Binance P2P vía CriptoYa (GET limpio, sin bloqueo de CORS)
+        fetch('https://criptoya.com/api/binancep2p/USDT/VES/100', { cache: 'no-store' })
+          .then(r => r.json())
+          .then(data => ({
+            data: [{ adv: { price: data.ask } }]
+          }))
       ]);
 
       // BCV
@@ -739,8 +705,6 @@
     }
 
     // ─── Converter ──────────────────────────────────────────
-    // Siempre muestra cuántos Bs equivale el monto — una fila por tasa.
-
     function setInputCurrency(currency) {
       inputCurrency = currency;
       document.querySelectorAll('.toggle-btn').forEach(b => {
@@ -767,7 +731,6 @@
       let rowsHtml = '';
 
       if (inputCurrency === 'USD') {
-        // Divisa → Bs: cada tasa muestra cuántos Bs da 1 USD (o el monto)
         if (rates.bcv_usd)
           rowsHtml += row('#f59e0b', 'Dólar BCV',   'Bs. ' + fmtVES.format(amount * rates.bcv_usd));
         if (rates.binance_usd)
@@ -777,10 +740,8 @@
         note.textContent = amount + ' USD en bolívares · Solo referencial';
 
       } else if (inputCurrency === 'EUR') {
-        // EUR → Bs directo con la tasa EUR del BCV
         if (rates.bcv_eur)
           rowsHtml += row('#3b82f6', 'Euro BCV',    'Bs. ' + fmtVES.format(amount * rates.bcv_eur));
-        // EUR → Bs vía Binance: EUR→USD (vía BCV USD/EUR) → Bs (vía Binance)
         if (rates.bcv_eur && rates.bcv_usd && rates.binance_usd) {
           const eurToUsd = (amount * rates.bcv_eur) / rates.bcv_usd;
           rowsHtml += row('#f0b90b', 'Binance P2P', 'Bs. ' + fmtVES.format(eurToUsd * rates.binance_usd));
@@ -790,7 +751,6 @@
         note.textContent = amount + ' EUR en bolívares · Solo referencial';
 
       } else { // VES
-        // Bs → divisas
         if (rates.bcv_usd)
           rowsHtml += row('#f59e0b', 'Dólar BCV',   '$ '   + fmtFX.format(amount / rates.bcv_usd));
         if (rates.binance_usd)
