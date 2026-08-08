@@ -19,7 +19,13 @@ jobs:
           import urllib.request
           import json
           import re
+          import ssl
           from datetime import datetime, timezone
+
+          # Ignorar la verificación del certificado SSL del BCV
+          ctx = ssl.create_default_context()
+          ctx.check_hostname = False
+          ctx.verify_mode = ssl.CERT_NONE
 
           req = urllib.request.Request(
             'https://www.bcv.org.ve/',
@@ -29,7 +35,7 @@ jobs:
               'Cache-Control': 'no-cache',
             }
           )
-          with urllib.request.urlopen(req, timeout=15) as res:
+          with urllib.request.urlopen(req, context=ctx, timeout=15) as res:
             html = res.read().decode('utf-8', errors='replace')
 
           def extract(currency_id):
