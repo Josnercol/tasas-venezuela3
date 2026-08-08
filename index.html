@@ -624,52 +624,41 @@
     }
 
     // ─── Load Rates ──────────────────────────────────────────
-    async function loadRates() {
-      const btn = document.getElementById('refreshBtn');
-      btn.classList.add('loading');
-      hideError();
+async function loadRates() {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('loading');
+  hideError();
 
-      const [bcvRes, binRes] = await Promise.allSettled([
-        // BCV desde archivo estático
-        fetch('/rates.json?_=' + Date.now(), { cache: 'no-store' }).then(r => r.json()),
+  const [bcvRes, binRes] = await Promise.allSettled([
+    fetch('/rates.json?_=' + Date.now(), { cache: 'no-store' }).then(r => r.json()),
+    fetch('/api/binance?_=' + Date.now(), { cache: 'no-store' }).then(r => r.json()) // <--- Llamada local
+  ]);
 
-        // Binance P2P vía CriptoYa (GET limpio, sin bloqueo de CORS)
-        fetch('https://criptoya.com/api/binancep2p/USDT/VES/100', { cache: 'no-store' })
-          .then(r => r.json())
-          .then(data => ({
-            data: [{ adv: { price: data.ask } }]
-          }))
-      ]);
+  // BCV
+  if (bcvRes.status === 'fulfilled' && bcvRes.value) {
+    const d = bcvRes.value;
+    rates.bcv_usd = typeof d.bcv_usd === 'number' ? d.bcv_usd : null;
+    rates.bcv_eur = typeof d.bcv_eur === 'number' ? d.bcv_eur : null;
+  }
 
-      // BCV
-      if (bcvRes.status === 'fulfilled') {
-        const d = bcvRes.value;
-        rates.bcv_usd = typeof d.bcv_usd === 'number' ? d.bcv_usd : null;
-        rates.bcv_eur = typeof d.bcv_eur === 'number' ? d.bcv_eur : null;
-      }
+  // Binance P2P vía API de Vercel
+  if (binRes.status === 'fulfilled' && binRes.value) {
+    const askPrice = parseFloat(binRes.value.ask);
+    rates.binance_usd = (!isNaN(askPrice) && askPrice > 0) ? askPrice : null;
+  }
 
-      // Binance
-      if (binRes.status === 'fulfilled') {
-        const prices = (binRes.value?.data || [])
-          .map(i => parseFloat(i.adv?.price))
-          .filter(p => !isNaN(p) && p > 0);
-        rates.binance_usd = prices.length
-          ? parseFloat((prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2))
-          : null;
-      }
+  renderCards();
+  convert();
 
-      renderCards();
-      convert();
+  if (!rates.bcv_usd && !rates.binance_usd) {
+    showError('Sin conexión. Verifica tu internet e intenta de nuevo.');
+    document.getElementById('updateTime').textContent = 'Error de conexión';
+  } else {
+    document.getElementById('updateTime').textContent = 'Actualizado ' + fmtTime();
+  }
 
-      if (!rates.bcv_usd && !rates.binance_usd) {
-        showError('Sin conexion. Verifica tu internet e intenta de nuevo.');
-        document.getElementById('updateTime').textContent = 'Error de conexion';
-      } else {
-        document.getElementById('updateTime').textContent = 'Actualizado ' + fmtTime();
-      }
-
-      btn.classList.remove('loading');
-    }
+  btn.classList.remove('loading');
+}
 
     // ─── Render rate cards ────────────────────────────────────
     function renderCards() {
