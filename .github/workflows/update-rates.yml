@@ -3,7 +3,7 @@ name: Actualizar Tasas BCV
 on:
   schedule:
     - cron: '*/30 * * * *'  # Cada 30 minutos
-  workflow_dispatch:          # También se puede correr manualmente
+  workflow_dispatch:          # Ejecución manual
 
 jobs:
   update:
@@ -13,7 +13,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Scrapear BCV
+      - name: Scrapear BCV Directo
         run: |
           python3 << 'PYEOF'
           import urllib.request
@@ -22,55 +22,55 @@ jobs:
           import ssl
           from datetime import datetime, timezone
 
+          # Desactivar verificación de certificado SSL (necesario para el servidor del BCV)
           ctx = ssl.create_default_context()
           ctx.check_hostname = False
           ctx.verify_mode = ssl.CERT_NONE
 
-          req = urllib.request.Request(
-            'https://www.bcv.org.ve/',
-            headers={
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-              'Accept-Language': 'es-ES,es;q=0.9',
-              'Cache-Control': 'no-cache',
-            }
-          )
+          headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
+          }
+
+          bcv_usd = None
+          bcv_eur = None
 
           try:
+            req = urllib.request.Request('https://www.bcv.org.ve/', headers=headers)
             with urllib.request.urlopen(req, context=ctx, timeout=20) as res:
               html = res.read().decode('utf-8', errors='replace')
+
+            # Buscar específicamente en el contenedor id="dolar" y extraer el valor dentro de <strong>
+            usd_match = re.search(r'id=["\']dolar["\'][\s\S]*?<strong>\s*([\d.,]+)\s*<\/strong>', html, re.IGNORECASE)
+            if usd_match:
+              val_str = usd_match.group(1).replace('.', '').replace(',', '.')
+              bcv_usd = round(float(val_str), 2)
+
+            # Buscar en el contenedor id="euro"
+            eur_match = re.search(r'id=["\']euro["\'][\s\S]*?<strong>\s*([\d.,]+)\s*<\/strong>', html, re.IGNORECASE)
+            if eur_match:
+              val_str = eur_match.group(1).replace('.', '').replace(',', '.')
+              bcv_eur = round(float(val_str), 2)
+
           except Exception as e:
-            print(f"Error cargando pagina BCV: {e}")
-            html = ""
+            print(f"Error al conectar con el BCV: {e}")
 
-          def parse_rate(currency_id):
-            if not html:
-              return None
-            # Busca la sección donde está el div de la moneda (dolar / euro)
-            pattern = rf'id="{currency_id}".*?<strong>\s*([\d.,]+)\s*</strong>'
-            match = re.search(pattern, html, re.DOTALL | re.IGNORECASE)
-            if match:
-              raw_val = match.group(1).strip()
-              val = float(raw_val.replace('.', '').replace(',', '.'))
-              return round(val, 2)
-            return None
-
-          bcv_usd = parse_rate('dolar')
-          bcv_eur = parse_rate('euro')
-
-          print(f"Resultado scraping -> USD: {bcv_usd}, EUR: {bcv_eur}")
+          source_status = 'bcv_direct' if bcv_usd is not None else 'error'
 
           rates = {
             'bcv_usd': bcv_usd,
             'bcv_eur': bcv_eur,
-            'source': 'bcv_direct' if bcv_usd else 'error',
+            'source': source_status,
             'timestamp': datetime.now(timezone.utc).isoformat()
           }
 
           with open('public/rates.json', 'w') as f:
             json.dump(rates, f, indent=2)
 
-          print(f"Guardado en rates.json correctamente.")
+          print(f"Resultado directo BCV: USD={bcv_usd}, EUR={bcv_eur}, Estado={source_status}")
           PYEOF
 
       - name: Commit y push rates.json
@@ -78,5 +78,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add public/rates.json
-          git diff --staged --quiet || git commit -m "chore: actualizar tasas BCV $(date -u '+%Y-%m-%d %H:%M') UTC"
+          git diff --staged --quiet || git commit -m "chore: actualizar tasas BCV directo $(date -u '+%Y-%m-%d %H:%M') UTC"
           git push
