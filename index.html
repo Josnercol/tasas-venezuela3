@@ -629,48 +629,24 @@ async function loadRates() {
   btn.classList.add('loading');
   hideError();
 
-  // Hacemos las dos peticiones al mismo tiempo:
-  // 1. A tu archivo local rates.json (BCV)
-  // 2. A tu nueva función de Vercel /api/binance (Binance P2P)
   const [bcvRes, binRes] = await Promise.allSettled([
     fetch('/rates.json?_=' + Date.now(), { cache: 'no-store' }).then(r => r.json()),
-    fetch('/api/binance?_=' + Date.now(), { cache: 'no-store' }).then(r => r.json()) // <-- AQUÍ ESTÁ EL CAMBIO
+    fetch('/api/binance?_=' + Date.now(), { cache: 'no-store' }).then(r => r.json())
   ]);
 
-  // 1. Procesar respuesta del BCV
+  // BCV
   if (bcvRes.status === 'fulfilled' && bcvRes.value) {
     const d = bcvRes.value;
     rates.bcv_usd = typeof d.bcv_usd === 'number' ? d.bcv_usd : null;
     rates.bcv_eur = typeof d.bcv_eur === 'number' ? d.bcv_eur : null;
   }
 
-  // 2. Procesar respuesta de la Serverless Function de Binance
+  // Binance P2P
   if (binRes.status === 'fulfilled' && binRes.value) {
     const askPrice = parseFloat(binRes.value.ask);
-    // Si la función nos devuelve un número válido mayor a 0, lo guardamos
     rates.binance_usd = (!isNaN(askPrice) && askPrice > 0) ? askPrice : null;
   } else {
     rates.binance_usd = null;
-  }
-
-  // Dibujar las tarjetas en pantalla y actualizar el convertidor
-  renderCards();
-  convert();
-
-  // Comprobar estado de conexión
-  if (!rates.bcv_usd && !rates.binance_usd) {
-    showError('Sin conexión. Verifica tu internet e intenta de nuevo.');
-    document.getElementById('updateTime').textContent = 'Error de conexión';
-  } else {
-    document.getElementById('updateTime').textContent = 'Actualizado ' + fmtTime();
-  }
-
-  btn.classList.remove('loading');
-}
-  // Binance P2P vía API de Vercel
-  if (binRes.status === 'fulfilled' && binRes.value) {
-    const askPrice = parseFloat(binRes.value.ask);
-    rates.binance_usd = (!isNaN(askPrice) && askPrice > 0) ? askPrice : null;
   }
 
   renderCards();
