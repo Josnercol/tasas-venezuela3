@@ -664,8 +664,8 @@
         // BCV desde archivo estático — siempre fresco, sin CORS
         fetch('/rates.json?_=' + Date.now(), { cache: 'no-store' }).then(r => r.json()),
 
-        // Binance directo desde el browser — sin problemas de CORS
-        fetch('https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search', {
+// Binance a través de proxy CORS
+        fetch('https://corsproxy.io/?' + encodeURIComponent('https://p2p.binance.com/bapi/c2c/v5/friendly/c2c/search-single-page'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
