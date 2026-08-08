@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=59');
 
   try {
-    const response = await fetch('https://criptoya.com/api/binance/usdt/ves', {
+    const response = await fetch('https://criptoya.com/api/binance/USDT/VES', {
       headers: { 'User-Agent': 'Mozilla/5.0' }
     });
 
