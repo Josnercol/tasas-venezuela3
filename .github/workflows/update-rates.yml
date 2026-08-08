@@ -13,64 +13,81 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Configurar Python e Instalar Librerías
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Instalar Dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4 urllib3
+
       - name: Scrapear BCV Directo
         run: |
           python3 << 'PYEOF'
-          import urllib.request
+          import requests
+          from bs4 import BeautifulSoup
           import json
-          import re
-          import ssl
+          import urllib3
           from datetime import datetime, timezone
 
-          # Desactivar verificación de certificado SSL (necesario para el servidor del BCV)
-          ctx = ssl.create_default_context()
-          ctx.check_hostname = False
-          ctx.verify_mode = ssl.CERT_NONE
+          # Desactivar advertencias de SSL inseguro
+          urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+          url = 'https://www.bcv.org.ve/'
           headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-            'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+              'Accept-Language': 'es-ES,es;q=0.9',
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
           }
 
           bcv_usd = None
           bcv_eur = None
 
           try:
-            req = urllib.request.Request('https://www.bcv.org.ve/', headers=headers)
-            with urllib.request.urlopen(req, context=ctx, timeout=20) as res:
-              html = res.read().decode('utf-8', errors='replace')
+              # Petición HTTP directa al BCV
+              response = requests.get(url, headers=headers, verify=False, timeout=25)
+              
+              if response.status_code == 200:
+                  soup = BeautifulSoup(response.content, 'html.parser')
 
-            # Buscar específicamente en el contenedor id="dolar" y extraer el valor dentro de <strong>
-            usd_match = re.search(r'id=["\']dolar["\'][\s\S]*?<strong>\s*([\d.,]+)\s*<\/strong>', html, re.IGNORECASE)
-            if usd_match:
-              val_str = usd_match.group(1).replace('.', '').replace(',', '.')
-              bcv_usd = round(float(val_str), 2)
+                  # Buscar contenedor del Dólar (#dolar)
+                  dolar_div = soup.find('div', id='dolar')
+                  if dolar_div:
+                      strong_usd = dolar_div.find('strong')
+                      if strong_usd:
+                          raw_val = strong_usd.text.strip()
+                          val = float(raw_val.replace('.', '').replace(',', '.'))
+                          bcv_usd = round(val, 2)
 
-            # Buscar en el contenedor id="euro"
-            eur_match = re.search(r'id=["\']euro["\'][\s\S]*?<strong>\s*([\d.,]+)\s*<\/strong>', html, re.IGNORECASE)
-            if eur_match:
-              val_str = eur_match.group(1).replace('.', '').replace(',', '.')
-              bcv_eur = round(float(val_str), 2)
+                  # Buscar contenedor del Euro (#euro)
+                  euro_div = soup.find('div', id='euro')
+                  if euro_div:
+                      strong_eur = euro_div.find('strong')
+                      if strong_eur:
+                          raw_val = strong_eur.text.strip()
+                          val = float(raw_val.replace('.', '').replace(',', '.'))
+                          bcv_eur = round(val, 2)
 
           except Exception as e:
-            print(f"Error al conectar con el BCV: {e}")
+              print(f"Error al intentar obtener los datos del BCV: {e}")
 
           source_status = 'bcv_direct' if bcv_usd is not None else 'error'
 
           rates = {
-            'bcv_usd': bcv_usd,
-            'bcv_eur': bcv_eur,
-            'source': source_status,
-            'timestamp': datetime.now(timezone.utc).isoformat()
+              'bcv_usd': bcv_usd,
+              'bcv_eur': bcv_eur,
+              'source': source_status,
+              'timestamp': datetime.now(timezone.utc).isoformat()
           }
 
           with open('public/rates.json', 'w') as f:
-            json.dump(rates, f, indent=2)
+              json.dump(rates, f, indent=2)
 
-          print(f"Resultado directo BCV: USD={bcv_usd}, EUR={bcv_eur}, Estado={source_status}")
+          print(f"Resultado final -> USD: {bcv_usd}, EUR: {bcv_eur}, Estado: {source_status}")
           PYEOF
 
       - name: Commit y push rates.json
