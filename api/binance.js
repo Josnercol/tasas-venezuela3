@@ -4,7 +4,6 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=59');
 
   try {
-    // Endpoint directo para USDT/VES en Binance
     const response = await fetch('https://criptoya.com/api/binance/usdt/ves', {
       headers: { 'User-Agent': 'Mozilla/5.0' }
     });
@@ -14,8 +13,6 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
-    
-    // CriptoYa devuelve { "ask": 780.5, "bid": 775.2, "time": ... }
     const askValue = data.ask || data.askPrice || null;
 
     return res.status(200).json({ ask: askValue });
