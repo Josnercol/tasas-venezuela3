@@ -599,7 +599,7 @@
 
       const timestamp = Date.now();
       const [bcvRes, binRes] = await Promise.allSettled([
-        fetch('/rates.json?_t=' + timestamp, { cache: 'no-store' }).then(r => r.json()),
+        fetch('rates.json?_t=' + timestamp, { cache: 'no-store' }).then(r => r.json()),
         fetch('/api/binance?_t=' + timestamp, { cache: 'no-store' }).then(r => r.json())
       ]);
 
