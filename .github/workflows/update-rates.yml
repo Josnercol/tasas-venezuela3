@@ -1,0 +1,67 @@
+name: Actualizar Tasas BCV
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'  # Cada 30 minutos
+  workflow_dispatch:          # También se puede correr manualmente
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Scrapear BCV
+        run: |
+          python3 << 'PYEOF'
+          import urllib.request
+          import json
+          import re
+          from datetime import datetime, timezone
+
+          req = urllib.request.Request(
+            'https://www.bcv.org.ve/',
+            headers={
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36',
+              'Accept': 'text/html',
+              'Cache-Control': 'no-cache',
+            }
+          )
+          with urllib.request.urlopen(req, timeout=15) as res:
+            html = res.read().decode('utf-8', errors='replace')
+
+          def extract(currency_id):
+            idx = html.find(f'id="{currency_id}"')
+            if idx == -1:
+              return None
+            block = html[idx:idx+500]
+            m = re.search(r'<strong>([\d.,]+)</strong>', block)
+            if not m:
+              return None
+            val = float(m.group(1).replace('.','').replace(',','.'))
+            return round(val, 2) if val > 1 else None
+
+          bcv_usd = extract('dolar')
+          bcv_eur = extract('euro')
+          print(f"BCV: USD={bcv_usd} EUR={bcv_eur}")
+
+          rates = {
+            'bcv_usd': bcv_usd,
+            'bcv_eur': bcv_eur,
+            'source': 'bcv_direct' if bcv_usd else 'error',
+            'timestamp': datetime.now(timezone.utc).isoformat()
+          }
+          with open('public/rates.json', 'w') as f:
+            json.dump(rates, f)
+          print(f"Guardado: {rates}")
+          PYEOF
+
+      - name: Commit y push rates.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/rates.json
+          git diff --staged --quiet || git commit -m "chore: actualizar tasas BCV $(date -u '+%Y-%m-%d %H:%M') UTC"
+          git push
