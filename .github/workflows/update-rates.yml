@@ -22,7 +22,6 @@ jobs:
           import ssl
           from datetime import datetime, timezone
 
-          # Ignorar la verificación del certificado SSL del BCV
           ctx = ssl.create_default_context()
           ctx.check_hostname = False
           ctx.verify_mode = ssl.CERT_NONE
@@ -30,28 +29,36 @@ jobs:
           req = urllib.request.Request(
             'https://www.bcv.org.ve/',
             headers={
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36',
-              'Accept': 'text/html',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              'Accept-Language': 'es-ES,es;q=0.9',
               'Cache-Control': 'no-cache',
             }
           )
-          with urllib.request.urlopen(req, context=ctx, timeout=15) as res:
-            html = res.read().decode('utf-8', errors='replace')
 
-          def extract(currency_id):
-            idx = html.find(f'id="{currency_id}"')
-            if idx == -1:
-              return None
-            block = html[idx:idx+500]
-            m = re.search(r'<strong>([\d.,]+)</strong>', block)
-            if not m:
-              return None
-            val = float(m.group(1).replace('.','').replace(',','.'))
-            return round(val, 2) if val > 1 else None
+          try:
+            with urllib.request.urlopen(req, context=ctx, timeout=20) as res:
+              html = res.read().decode('utf-8', errors='replace')
+          except Exception as e:
+            print(f"Error cargando pagina BCV: {e}")
+            html = ""
 
-          bcv_usd = extract('dolar')
-          bcv_eur = extract('euro')
-          print(f"BCV: USD={bcv_usd} EUR={bcv_eur}")
+          def parse_rate(currency_id):
+            if not html:
+              return None
+            # Busca la sección donde está el div de la moneda (dolar / euro)
+            pattern = rf'id="{currency_id}".*?<strong>\s*([\d.,]+)\s*</strong>'
+            match = re.search(pattern, html, re.DOTALL | re.IGNORECASE)
+            if match:
+              raw_val = match.group(1).strip()
+              val = float(raw_val.replace('.', '').replace(',', '.'))
+              return round(val, 2)
+            return None
+
+          bcv_usd = parse_rate('dolar')
+          bcv_eur = parse_rate('euro')
+
+          print(f"Resultado scraping -> USD: {bcv_usd}, EUR: {bcv_eur}")
 
           rates = {
             'bcv_usd': bcv_usd,
@@ -59,9 +66,11 @@ jobs:
             'source': 'bcv_direct' if bcv_usd else 'error',
             'timestamp': datetime.now(timezone.utc).isoformat()
           }
+
           with open('public/rates.json', 'w') as f:
-            json.dump(rates, f)
-          print(f"Guardado: {rates}")
+            json.dump(rates, f, indent=2)
+
+          print(f"Guardado en rates.json correctamente.")
           PYEOF
 
       - name: Commit y push rates.json
