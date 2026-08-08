@@ -264,7 +264,6 @@
 
     @keyframes shimmer { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
-    /* Divider */
     .section-title {
       font-size: 12px;
       font-weight: 600;
@@ -307,7 +306,6 @@
       letter-spacing: -0.01em;
     }
 
-    /* Toggle arriba, input abajo */
     .calc-toggle-row {
       display: flex;
       gap: 8px;
@@ -357,7 +355,6 @@
       border-color: var(--green);
     }
 
-    /* Resultado: lista limpia sin bordes */
     .convert-results {
       display: flex;
       flex-direction: column;
@@ -404,10 +401,6 @@
       text-align: center;
     }
 
-    /* Legacy — keep for compat */
-    .field-group, .field-row, .field-label, .field-select, .currency-toggle { display: none; }
-
-    /* Error banner */
     .error-banner {
       background: var(--red-dim);
       color: var(--red-text);
@@ -422,7 +415,6 @@
 
     .error-banner svg { width: 16px; height: 16px; flex-shrink: 0; }
 
-    /* Footer */
     .footer {
       text-align: center;
       margin-top: 28px;
@@ -431,9 +423,6 @@
       line-height: 1.8;
     }
 
-    .footer a { color: var(--green); text-decoration: none; }
-
-    /* Install prompt */
     .install-bar {
       background: var(--surface);
       border: 1.5px solid var(--green);
@@ -478,18 +467,10 @@
     }
 
     .install-btn-close svg { width: 16px; height: 16px; }
-
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after {
-        animation-duration: 0.01ms !important;
-        transition-duration: 0.01ms !important;
-      }
-    }
   </style>
 </head>
 <body>
 
-  <!-- Header -->
   <header class="header">
     <div class="logo">
       <div class="logo-icon">
@@ -512,7 +493,6 @@
 
   <main class="content">
 
-    <!-- Install prompt (Android PWA) -->
     <div class="install-bar" id="installBar">
       <p>Instala <strong>Tasas Venezuela</strong> en tu teléfono para acceso rápido sin abrir el browser.</p>
       <button class="install-btn-ok" id="installBtn">Instalar</button>
@@ -521,13 +501,11 @@
       </button>
     </div>
 
-    <!-- Error -->
     <div class="error-banner" id="errorBanner">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <span id="errorText">No se pudo conectar. Verifica tu internet e intenta de nuevo.</span>
     </div>
 
-    <!-- Live indicator -->
     <div class="live-bar">
       <div class="live-pill">
         <div class="live-dot"></div>
@@ -536,34 +514,31 @@
       <div class="update-time" id="updateTime">Cargando...</div>
     </div>
 
-    <!-- Rate cards -->
+    <!-- Rates Grid -->
     <div class="rates-grid" id="ratesGrid">
-      <!-- BCV USD -->
       <div class="rate-card">
         <div class="card-source">
           <div class="source-dot" style="background:#f59e0b"></div>
           <span class="source-name">BCV Oficial</span>
         </div>
         <div class="rate-value"><div class="rate-skeleton" style="width:90%;height:26px;border-radius:5px"></div></div>
-        <div class="rate-unit" style="margin-top:6px"><div class="rate-skeleton" style="width:70%;height:13px;border-radius:4px;margin-top:6px"></div></div>
+        <div class="rate-unit" style="margin-top:6px"><div class="rate-skeleton" style="width:70%;height:13px;border-radius:4px"></div></div>
       </div>
-      <!-- Binance P2P -->
       <div class="rate-card">
         <div class="card-source">
           <div class="source-dot" style="background:#f0b90b"></div>
           <span class="source-name">Binance P2P</span>
         </div>
         <div class="rate-value"><div class="rate-skeleton" style="width:90%;height:26px;border-radius:5px"></div></div>
-        <div class="rate-unit"><div class="rate-skeleton" style="width:70%;height:13px;border-radius:4px;margin-top:6px"></div></div>
+        <div class="rate-unit"><div class="rate-skeleton" style="width:70%;height:13px;border-radius:4px"></div></div>
       </div>
-      <!-- BCV EUR (full width) -->
       <div class="rate-card wide">
         <div class="card-source">
           <div class="source-dot" style="background:#3b82f6"></div>
           <span class="source-name">BCV Oficial · Euro</span>
         </div>
         <div class="rate-value"><div class="rate-skeleton" style="width:60%;height:26px;border-radius:6px"></div></div>
-        <div class="rate-unit"><div class="rate-skeleton" style="width:50%;height:13px;border-radius:4px;margin-top:6px"></div></div>
+        <div class="rate-unit"><div class="rate-skeleton" style="width:50%;height:13px;border-radius:4px"></div></div>
       </div>
     </div>
 
@@ -579,19 +554,15 @@
           <span>Calculadora</span>
         </div>
 
-        <!-- Toggle moneda -->
         <div class="calc-toggle-row" role="group" aria-label="Moneda de entrada">
           <button type="button" class="toggle-btn active" data-currency="USD" onclick="setInputCurrency('USD')">USD $</button>
           <button type="button" class="toggle-btn" data-currency="VES" onclick="setInputCurrency('VES')">VES Bs</button>
         </div>
 
-        <!-- Input monto -->
         <input class="field-input" type="number" id="calcAmount" value="1" min="0" inputmode="decimal" oninput="convert()" placeholder="0" />
       </div>
 
-      <!-- Resultados por tasa -->
       <div class="convert-results" id="convertResults"></div>
-
       <div class="calc-note" id="calcNote">Cargando tasas...</div>
     </div>
 
@@ -603,19 +574,17 @@
   </main>
 
   <script>
-    // ─── State ───────────────────────────────────────────────
     let rates = { bcv_usd: null, bcv_eur: null, binance_usd: null };
     let inputCurrency = 'USD';
     let deferredPrompt = null;
 
-    // ─── Formatting ──────────────────────────────────────────
     function fmtVES(n) {
-      if (n == null) return '—';
+      if (n == null || isNaN(n)) return '—';
       return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
     }
 
     function fmtUSD(n) {
-      if (n == null) return '—';
+      if (n == null || isNaN(n)) return '—';
       return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(n);
     }
 
@@ -623,46 +592,45 @@
       return new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
     }
 
-    // ─── Load Rates ──────────────────────────────────────────
-async function loadRates() {
-  const btn = document.getElementById('refreshBtn');
-  btn.classList.add('loading');
-  hideError();
+    async function loadRates() {
+      const btn = document.getElementById('refreshBtn');
+      btn.classList.add('loading');
+      hideError();
 
-  const [bcvRes, binRes] = await Promise.allSettled([
-    fetch('/rates.json?_=' + Date.now(), { cache: 'no-store' }).then(r => r.json()),
-    fetch('/api/binance?_=' + Date.now(), { cache: 'no-store' }).then(r => r.json())
-  ]);
+      const timestamp = Date.now();
+      const [bcvRes, binRes] = await Promise.allSettled([
+        fetch('/rates.json?_t=' + timestamp, { cache: 'no-store' }).then(r => r.json()),
+        fetch('/api/binance?_t=' + timestamp, { cache: 'no-store' }).then(r => r.json())
+      ]);
 
-  // BCV
-  if (bcvRes.status === 'fulfilled' && bcvRes.value) {
-    const d = bcvRes.value;
-    rates.bcv_usd = typeof d.bcv_usd === 'number' ? d.bcv_usd : null;
-    rates.bcv_eur = typeof d.bcv_eur === 'number' ? d.bcv_eur : null;
-  }
+      // 1. BCV
+      if (bcvRes.status === 'fulfilled' && bcvRes.value) {
+        const d = bcvRes.value;
+        rates.bcv_usd = typeof d.bcv_usd === 'number' ? d.bcv_usd : null;
+        rates.bcv_eur = typeof d.bcv_eur === 'number' ? d.bcv_eur : null;
+      }
 
-  // Binance P2P
-  if (binRes.status === 'fulfilled' && binRes.value) {
-    const askPrice = parseFloat(binRes.value.ask);
-    rates.binance_usd = (!isNaN(askPrice) && askPrice > 0) ? askPrice : null;
-  } else {
-    rates.binance_usd = null;
-  }
+      // 2. Binance P2P
+      if (binRes.status === 'fulfilled' && binRes.value) {
+        const askPrice = parseFloat(binRes.value.ask);
+        rates.binance_usd = (!isNaN(askPrice) && askPrice > 0) ? askPrice : null;
+      } else {
+        rates.binance_usd = null;
+      }
 
-  renderCards();
-  convert();
+      renderCards();
+      convert();
 
-  if (!rates.bcv_usd && !rates.binance_usd) {
-    showError('Sin conexión. Verifica tu internet e intenta de nuevo.');
-    document.getElementById('updateTime').textContent = 'Error de conexión';
-  } else {
-    document.getElementById('updateTime').textContent = 'Actualizado ' + fmtTime();
-  }
+      if (!rates.bcv_usd && !rates.binance_usd) {
+        showError('Sin conexión. Verifica tu internet e intenta de nuevo.');
+        document.getElementById('updateTime').textContent = 'Error de conexión';
+      } else {
+        document.getElementById('updateTime').textContent = 'Actualizado ' + fmtTime();
+      }
 
-  btn.classList.remove('loading');
-}
+      btn.classList.remove('loading');
+    }
 
-    // ─── Render rate cards ────────────────────────────────────
     function renderCards() {
       const grid = document.getElementById('ratesGrid');
       grid.innerHTML = `
@@ -695,7 +663,6 @@ async function loadRates() {
       `;
     }
 
-    // ─── Converter ──────────────────────────────────────────
     function setInputCurrency(currency) {
       inputCurrency = currency;
       document.querySelectorAll('.toggle-btn').forEach(b => {
@@ -730,17 +697,6 @@ async function loadRates() {
           rowsHtml += row('#3b82f6', 'Euro BCV',    'Bs. ' + fmtVES.format(amount * rates.bcv_eur));
         note.textContent = amount + ' USD en bolívares · Solo referencial';
 
-      } else if (inputCurrency === 'EUR') {
-        if (rates.bcv_eur)
-          rowsHtml += row('#3b82f6', 'Euro BCV',    'Bs. ' + fmtVES.format(amount * rates.bcv_eur));
-        if (rates.bcv_eur && rates.bcv_usd && rates.binance_usd) {
-          const eurToUsd = (amount * rates.bcv_eur) / rates.bcv_usd;
-          rowsHtml += row('#f0b90b', 'Binance P2P', 'Bs. ' + fmtVES.format(eurToUsd * rates.binance_usd));
-        }
-        if (rates.bcv_usd)
-          rowsHtml += row('#f59e0b', 'Dólar BCV',   'Bs. ' + fmtVES.format(amount * rates.bcv_eur));
-        note.textContent = amount + ' EUR en bolívares · Solo referencial';
-
       } else { // VES
         if (rates.bcv_usd)
           rowsHtml += row('#f59e0b', 'Dólar BCV',   '$ '   + fmtFX.format(amount / rates.bcv_usd));
@@ -762,7 +718,6 @@ async function loadRates() {
         </div>`;
     }
 
-    // ─── Error helpers ────────────────────────────────────────
     function showError(msg) {
       const el = document.getElementById('errorBanner');
       document.getElementById('errorText').textContent = msg;
@@ -773,7 +728,6 @@ async function loadRates() {
       document.getElementById('errorBanner').style.display = 'none';
     }
 
-    // ─── PWA Install prompt (Android) ─────────────────────────
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
@@ -784,7 +738,6 @@ async function loadRates() {
     document.getElementById('installBtn').addEventListener('click', async () => {
       if (!deferredPrompt) return;
       deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
       deferredPrompt = null;
       document.getElementById('installBar').classList.remove('visible');
     });
@@ -793,16 +746,10 @@ async function loadRates() {
       document.getElementById('installBar').classList.remove('visible');
     });
 
-    window.addEventListener('appinstalled', () => {
-      document.getElementById('installBar').classList.remove('visible');
-    });
-
-    // ─── Service Worker ───────────────────────────────────────
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch(() => {});
     }
 
-    // ─── Init ─────────────────────────────────────────────────
     loadRates();
     setInterval(loadRates, 60000);
   </script>
