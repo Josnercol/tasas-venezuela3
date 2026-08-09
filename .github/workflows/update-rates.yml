@@ -84,8 +84,8 @@ jobs:
               'timestamp': datetime.now(timezone.utc).isoformat()
           }
 
-          with open('public/rates.json', 'w') as f:
-              json.dump(rates, f, indent=2)
+          with open('rates.json', 'w') as f:
+              json.dump(data, f, indent=2)
 
           print(f"Resultado final -> USD: {bcv_usd}, EUR: {bcv_eur}, Estado: {source_status}")
           PYEOF
