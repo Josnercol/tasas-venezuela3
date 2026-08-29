@@ -1,6 +1,6 @@
 {
-  "bcv_usd": 794.99,
-  "bcv_eur": 922.69,
-  "source": "bcv_direct",
-  "timestamp": "2026-08-29T21:02:07.432555+00:00"
+  "bcv_usd": null,
+  "bcv_eur": null,
+  "source": "error",
+  "timestamp": "2026-08-29T21:31:59.549711+00:00"
 }
