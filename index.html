@@ -191,6 +191,13 @@
 
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
+    .live-pill.stale { background: var(--amber-dim); color: var(--amber-text); }
+    .live-pill.stale .live-dot { background: var(--amber); }
+    .live-pill.error { background: var(--red-dim); color: var(--red-text); }
+    .live-pill.error .live-dot { background: var(--red-text); animation: none; }
+
+    .rate-value.gap-up { color: var(--amber); }
+
     .update-time {
       font-size: 12px;
       color: var(--text3);
@@ -275,6 +282,7 @@
 
     /* Calculator */
     .calc-card {
+      margin-top: 20px;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
@@ -385,6 +393,9 @@
       flex-shrink: 0;
     }
 
+    .convert-row { cursor: pointer; }
+    .convert-row:active { background: var(--surface2); }
+
     .convert-row .value {
       font-size: 20px;
       font-weight: 700;
@@ -478,7 +489,7 @@
       </div>
       <div>
         <div class="logo-name">Tasas Venezuela</div>
-        <div class="logo-tag">Venezuela</div>
+        <div class="logo-tag">BCV · Binance P2P</div>
       </div>
     </div>
     <button class="refresh-btn" id="refreshBtn" onclick="loadRates()" aria-label="Actualizar tasas">
@@ -507,9 +518,9 @@
     </div>
 
     <div class="live-bar">
-      <div class="live-pill">
+      <div class="live-pill" id="livePill">
         <div class="live-dot"></div>
-        En vivo
+        <span id="liveText">En vivo</span>
       </div>
       <div class="update-time" id="updateTime">Cargando...</div>
     </div>
@@ -532,18 +543,25 @@
         <div class="rate-value"><div class="rate-skeleton" style="width:90%;height:26px;border-radius:5px"></div></div>
         <div class="rate-unit"><div class="rate-skeleton" style="width:70%;height:13px;border-radius:4px"></div></div>
       </div>
-      <div class="rate-card wide">
+      <div class="rate-card">
         <div class="card-source">
           <div class="source-dot" style="background:#3b82f6"></div>
-          <span class="source-name">BCV Oficial · Euro</span>
+          <span class="source-name">Euro BCV</span>
         </div>
-        <div class="rate-value"><div class="rate-skeleton" style="width:60%;height:26px;border-radius:6px"></div></div>
-        <div class="rate-unit"><div class="rate-skeleton" style="width:50%;height:13px;border-radius:4px"></div></div>
+        <div class="rate-value"><div class="rate-skeleton" style="width:90%;height:26px;border-radius:5px"></div></div>
+        <div class="rate-unit"><div class="rate-skeleton" style="width:70%;height:13px;border-radius:4px"></div></div>
+      </div>
+      <div class="rate-card">
+        <div class="card-source">
+          <div class="source-dot" style="background:#a855f7"></div>
+          <span class="source-name">Brecha</span>
+        </div>
+        <div class="rate-value"><div class="rate-skeleton" style="width:90%;height:26px;border-radius:5px"></div></div>
+        <div class="rate-unit"><div class="rate-skeleton" style="width:70%;height:13px;border-radius:4px"></div></div>
       </div>
     </div>
 
     <!-- Calculator -->
-    <p class="section-title">Calculadora</p>
 
     <div class="calc-card">
       <div class="calc-top">
@@ -556,10 +574,11 @@
 
         <div class="calc-toggle-row" role="group" aria-label="Moneda de entrada">
           <button type="button" class="toggle-btn active" data-currency="USD" onclick="setInputCurrency('USD')">USD $</button>
+          <button type="button" class="toggle-btn" data-currency="EUR" onclick="setInputCurrency('EUR')">EUR €</button>
           <button type="button" class="toggle-btn" data-currency="VES" onclick="setInputCurrency('VES')">VES Bs</button>
         </div>
 
-        <input class="field-input" type="number" id="calcAmount" value="1" min="0" inputmode="decimal" oninput="convert()" placeholder="0" />
+        <input class="field-input" type="text" id="calcAmount" value="1" inputmode="decimal" autocomplete="off" oninput="convert()" placeholder="0" aria-label="Monto a convertir" />
       </div>
 
       <div class="convert-results" id="convertResults"></div>
@@ -568,23 +587,46 @@
 
     <footer class="footer">
       <div>Fuentes: <strong>BCV Oficial</strong> · Banco Central de Venezuela · <strong>Binance P2P</strong></div>
-      <div>Actualiza cada 60 segundos · Solo referencial</div>
+      <div>Binance se actualiza cada minuto · Toca un resultado para copiarlo · Solo referencial</div>
     </footer>
 
   </main>
 
   <script>
-    let rates = { bcv_usd: null, bcv_eur: null, binance_usd: null };
+    let rates = { bcv_usd: null, bcv_eur: null, binance_usd: null, fecha_valor: null, bcv_source: null };
     let inputCurrency = 'USD';
     let deferredPrompt = null;
+    let pollTimer = null;
+
+    const nf2 = new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     function fmtVES(n) {
       if (n == null || isNaN(n)) return '—';
-      return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+      return nf2.format(n);
     }
 
     function fmtTime() {
       return new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // "2026-10-16" -> "16/10/2026"
+    function fmtFecha(iso) {
+      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+      const [y, m, d] = iso.split('-');
+      return `${d}/${m}/${y}`;
+    }
+
+    // Acepta "1500", "1500.5", "1.500,50", "1.500.000" y "1500,5"
+    function parseAmount(str) {
+      let s = String(str || '').replace(/[^\d.,]/g, '');
+      if (!s) return 0;
+      if (s.includes(',')) {
+        s = s.replace(/\./g, '').replace(',', '.');
+      } else if ((s.match(/\./g) || []).length > 1) {
+        s = s.replace(/\./g, '');
+      }
+      const n = parseFloat(s);
+      return isNaN(n) ? 0 : n;
     }
 
     async function loadRates() {
@@ -604,38 +646,62 @@
         })
       ]);
 
-      // 1. BCV
+      // 1. BCV — si falla la petición, se conservan las últimas tasas mostradas
       if (bcvRes.status === 'fulfilled' && bcvRes.value) {
         const d = bcvRes.value;
-        rates.bcv_usd = typeof d.bcv_usd === 'number' ? d.bcv_usd : null;
-        rates.bcv_eur = typeof d.bcv_eur === 'number' ? d.bcv_eur : null;
-      } else {
-        rates.bcv_usd = null;
-        rates.bcv_eur = null;
+        if (typeof d.bcv_usd === 'number') rates.bcv_usd = d.bcv_usd;
+        if (typeof d.bcv_eur === 'number') rates.bcv_eur = d.bcv_eur;
+        rates.fecha_valor = d.fecha_valor || null;
+        rates.bcv_source = d.source || null;
       }
 
-      // 2. Binance P2P
+      // 2. Binance P2P — igual: un fallo momentáneo no borra la última tasa
+      let binanceOk = false;
       if (binRes.status === 'fulfilled' && binRes.value) {
         const askPrice = parseFloat(binRes.value.ask);
-        rates.binance_usd = (!isNaN(askPrice) && askPrice > 0) ? askPrice : null;
-      } else {
-        rates.binance_usd = null;
+        if (!isNaN(askPrice) && askPrice > 0) {
+          rates.binance_usd = askPrice;
+          binanceOk = true;
+        }
       }
 
       renderCards();
       convert();
 
+      const bcvOk = bcvRes.status === 'fulfilled' && rates.bcv_source === 'bcv_direct';
       if (!rates.bcv_usd && !rates.binance_usd) {
         showError('Sin conexión. Verifica tu internet e intenta de nuevo.');
+        setLive('error', 'Sin conexión');
         document.getElementById('updateTime').textContent = 'Error de conexión';
       } else {
+        if (bcvOk && binanceOk) setLive('ok', 'En vivo');
+        else setLive('stale', 'Datos parciales');
         document.getElementById('updateTime').textContent = 'Actualizado ' + fmtTime();
       }
 
       btn.classList.remove('loading');
     }
 
+    function setLive(state, text) {
+      const pill = document.getElementById('livePill');
+      pill.classList.toggle('stale', state === 'stale');
+      pill.classList.toggle('error', state === 'error');
+      document.getElementById('liveText').textContent = text;
+    }
+
     function renderCards() {
+      const fecha = fmtFecha(rates.fecha_valor);
+      const bcvUnit = fecha ? 'Bs por 1 USD · Valor ' + fecha : 'Bs por 1 USD · Banco Central';
+      const eurUnit = fecha ? 'Bs por 1 EUR · Valor ' + fecha : 'Bs por 1 EUR · Banco Central';
+
+      let gapValue = '—';
+      let gapClass = '';
+      if (rates.bcv_usd && rates.binance_usd) {
+        const gap = (rates.binance_usd / rates.bcv_usd - 1) * 100;
+        gapValue = (gap > 0 ? '+' : '') + nf2.format(gap) + '%';
+        if (gap > 0) gapClass = ' gap-up';
+      }
+
       const grid = document.getElementById('ratesGrid');
       grid.innerHTML = `
         <div class="rate-card">
@@ -644,7 +710,7 @@
             <span class="source-name">BCV Oficial</span>
           </div>
           <div class="rate-value">${rates.bcv_usd ? fmtVES(rates.bcv_usd) : '—'}</div>
-          <div class="rate-unit">Bs por 1 USD · Banco Central</div>
+          <div class="rate-unit">${bcvUnit}</div>
         </div>
 
         <div class="rate-card">
@@ -656,13 +722,22 @@
           <div class="rate-unit">Bs por 1 USDT · P2P</div>
         </div>
 
-        <div class="rate-card wide">
+        <div class="rate-card">
           <div class="card-source">
             <div class="source-dot" style="background:#3b82f6"></div>
-            <span class="source-name">BCV Oficial · Euro</span>
+            <span class="source-name">Euro BCV</span>
           </div>
           <div class="rate-value">${rates.bcv_eur ? fmtVES(rates.bcv_eur) : '—'}</div>
-          <div class="rate-unit">Bs por 1 EUR · Banco Central</div>
+          <div class="rate-unit">${eurUnit}</div>
+        </div>
+
+        <div class="rate-card">
+          <div class="card-source">
+            <div class="source-dot" style="background:#a855f7"></div>
+            <span class="source-name">Brecha</span>
+          </div>
+          <div class="rate-value${gapClass}">${gapValue}</div>
+          <div class="rate-unit">Binance vs. BCV</div>
         </div>
       `;
     }
@@ -676,7 +751,7 @@
     }
 
     function convert() {
-      const amount = parseFloat(document.getElementById('calcAmount').value) || 0;
+      const amount = parseAmount(document.getElementById('calcAmount').value);
       const note = document.getElementById('calcNote');
       const resultsEl = document.getElementById('convertResults');
 
@@ -687,28 +762,28 @@
         return;
       }
 
-      const fmtVES = new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const fmtFX  = new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
       let rowsHtml = '';
 
       if (inputCurrency === 'USD') {
         if (rates.bcv_usd)
-          rowsHtml += row('#f59e0b', 'Dólar BCV',   'Bs. ' + fmtVES.format(amount * rates.bcv_usd));
+          rowsHtml += row('#f59e0b', 'Dólar BCV',   'Bs. ' + nf2.format(amount * rates.bcv_usd));
         if (rates.binance_usd)
-          rowsHtml += row('#f0b90b', 'Binance P2P', 'Bs. ' + fmtVES.format(amount * rates.binance_usd));
+          rowsHtml += row('#f0b90b', 'Binance P2P', 'Bs. ' + nf2.format(amount * rates.binance_usd));
+        note.textContent = nf2.format(amount) + ' USD en bolívares · Solo referencial';
+
+      } else if (inputCurrency === 'EUR') {
         if (rates.bcv_eur)
-          rowsHtml += row('#3b82f6', 'Euro BCV',    'Bs. ' + fmtVES.format(amount * rates.bcv_eur));
-        note.textContent = amount + ' USD en bolívares · Solo referencial';
+          rowsHtml += row('#3b82f6', 'Euro BCV',    'Bs. ' + nf2.format(amount * rates.bcv_eur));
+        note.textContent = nf2.format(amount) + ' EUR en bolívares · Solo referencial';
 
       } else { // VES
         if (rates.bcv_usd)
-          rowsHtml += row('#f59e0b', 'Dólar BCV',   '$ '   + fmtFX.format(amount / rates.bcv_usd));
+          rowsHtml += row('#f59e0b', 'Dólar BCV',   '$ '   + nf2.format(amount / rates.bcv_usd));
         if (rates.binance_usd)
-          rowsHtml += row('#f0b90b', 'Binance P2P', '$ '   + fmtFX.format(amount / rates.binance_usd));
+          rowsHtml += row('#f0b90b', 'Binance P2P', '$ '   + nf2.format(amount / rates.binance_usd));
         if (rates.bcv_eur)
-          rowsHtml += row('#3b82f6', 'Euro BCV',    '€ '   + fmtFX.format(amount / rates.bcv_eur));
-        note.textContent = amount + ' Bs. en divisas · Solo referencial';
+          rowsHtml += row('#3b82f6', 'Euro BCV',    '€ '   + nf2.format(amount / rates.bcv_eur));
+        note.textContent = nf2.format(amount) + ' Bs. en divisas · Solo referencial';
       }
 
       resultsEl.innerHTML = rowsHtml;
@@ -716,10 +791,23 @@
 
     function row(dot, label, value) {
       return `
-        <div class="convert-row">
+        <div class="convert-row" onclick="copyValue(this)" title="Toca para copiar">
           <span class="source"><span class="source-dot" style="background:${dot}"></span>${label}</span>
           <span class="value">${value}</span>
         </div>`;
+    }
+
+    async function copyValue(rowEl) {
+      const text = rowEl.querySelector('.value').textContent.replace(/^(Bs\.|\$|€)\s*/, '');
+      const note = document.getElementById('calcNote');
+      try {
+        await navigator.clipboard.writeText(text);
+        const prev = note.textContent;
+        note.textContent = 'Copiado: ' + text;
+        setTimeout(() => { if (note.textContent === 'Copiado: ' + text) note.textContent = prev; }, 1500);
+      } catch {
+        // El portapapeles puede no estar disponible (http, permisos); no es crítico
+      }
     }
 
     function showError(msg) {
@@ -754,8 +842,28 @@
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
 
+    // Solo consultar mientras la app está visible; al volver, refrescar enseguida
+    function startPolling() {
+      if (pollTimer) return;
+      pollTimer = setInterval(loadRates, 60000);
+    }
+
+    function stopPolling() {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        loadRates();
+        startPolling();
+      }
+    });
+
     loadRates();
-    setInterval(loadRates, 60000);
+    startPolling();
   </script>
 
 </body>

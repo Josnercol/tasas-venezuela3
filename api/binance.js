@@ -1,12 +1,12 @@
 // api/binance.js
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=59');
 
   try {
     // Consulta directa a CriptoYa con la ruta estándar USDT/VES
     const response = await fetch('https://criptoya.com/api/binancep2p/USDT/VES/100', {
-      headers: { 'User-Agent': 'Mozilla/5.0' }
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(8000) // no esperar indefinidamente si CriptoYa se cuelga
     });
 
     const text = await response.text();
@@ -20,9 +20,16 @@ export default async function handler(req, res) {
     }
 
     const askValue = data.ask || data.askPrice || data.price || null;
+    const bidValue = data.bid || data.bidPrice || null;
 
-    return res.status(200).json({ ask: askValue });
+    // Solo cachear respuestas buenas
+    res.setHeader('Cache-Control', askValue
+      ? 's-maxage=30, stale-while-revalidate=59'
+      : 'no-store');
+
+    return res.status(200).json({ ask: askValue, bid: bidValue });
   } catch (error) {
+    res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({ ask: null, error: error.message });
   }
 }
