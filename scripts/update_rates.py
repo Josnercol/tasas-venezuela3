@@ -1,5 +1,8 @@
 """Scrapea las tasas oficiales del BCV y actualiza rates.json.
 
+La tasa se usa desde el momento en que aparece en la portada del BCV, sin
+esperar a su fecha valor (a propósito: el cambio del viernes rige ya).
+
 Si el BCV no responde, conserva las últimas tasas válidas en vez de
 escribir null, para que la app nunca se quede sin datos.
 """
@@ -34,20 +37,11 @@ def parse_rate(soup, div_id):
     return round(val, 2) if val > 0 else None
 
 
-def parse_fecha_valor(soup):
-    # <span class="date-display-single" content="2026-10-16T00:00:00-04:00">
-    span = soup.find('span', class_='date-display-single')
-    if span and span.get('content'):
-        return span['content'][:10]
-    return None
-
-
 def scrape(html):
     soup = BeautifulSoup(html, 'html.parser')
     return {
         'bcv_usd': parse_rate(soup, 'dolar'),
         'bcv_eur': parse_rate(soup, 'euro'),
-        'fecha_valor': parse_fecha_valor(soup),
     }
 
 
@@ -66,7 +60,6 @@ def build_rates(scraped, previous, now):
         return {
             'bcv_usd': scraped['bcv_usd'],
             'bcv_eur': scraped.get('bcv_eur') or previous.get('bcv_eur'),
-            'fecha_valor': scraped.get('fecha_valor'),
             'source': 'bcv_direct',
             'timestamp': now,
         }
@@ -74,14 +67,13 @@ def build_rates(scraped, previous, now):
     return {
         'bcv_usd': previous.get('bcv_usd'),
         'bcv_eur': previous.get('bcv_eur'),
-        'fecha_valor': previous.get('fecha_valor'),
         'source': 'stale' if previous.get('bcv_usd') else 'error',
         'timestamp': previous.get('timestamp', now),
     }
 
 
 def same_data(a, b):
-    keys = ('bcv_usd', 'bcv_eur', 'fecha_valor', 'source')
+    keys = ('bcv_usd', 'bcv_eur', 'source')
     return all(a.get(k) == b.get(k) for k in keys)
 
 
@@ -97,7 +89,7 @@ def main():
 
     rates = build_rates(scraped, previous, datetime.now(timezone.utc).isoformat())
     print(f"Resultado -> USD: {rates['bcv_usd']}, EUR: {rates['bcv_eur']}, "
-          f"Fecha valor: {rates['fecha_valor']}, Estado: {rates['source']}")
+          f"Estado: {rates['source']}")
 
     # Solo reescribir si cambió algo real (evita un commit cada 30 min)
     if same_data(rates, previous):

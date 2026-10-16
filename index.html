@@ -593,7 +593,7 @@
   </main>
 
   <script>
-    let rates = { bcv_usd: null, bcv_eur: null, binance_usd: null, fecha_valor: null, bcv_source: null };
+    let rates = { bcv_usd: null, bcv_eur: null, binance_usd: null, bcv_source: null };
     let inputCurrency = 'USD';
     let deferredPrompt = null;
     let pollTimer = null;
@@ -607,13 +607,6 @@
 
     function fmtTime() {
       return new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
-    }
-
-    // "2026-10-16" -> "16/10/2026"
-    function fmtFecha(iso) {
-      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
-      const [y, m, d] = iso.split('-');
-      return `${d}/${m}/${y}`;
     }
 
     // Acepta "1500", "1500.5", "1.500,50", "1.500.000" y "1500,5"
@@ -651,7 +644,6 @@
         const d = bcvRes.value;
         if (typeof d.bcv_usd === 'number') rates.bcv_usd = d.bcv_usd;
         if (typeof d.bcv_eur === 'number') rates.bcv_eur = d.bcv_eur;
-        rates.fecha_valor = d.fecha_valor || null;
         rates.bcv_source = d.source || null;
       }
 
@@ -690,10 +682,6 @@
     }
 
     function renderCards() {
-      const fecha = fmtFecha(rates.fecha_valor);
-      const bcvUnit = fecha ? 'Bs por 1 USD · Valor ' + fecha : 'Bs por 1 USD · Banco Central';
-      const eurUnit = fecha ? 'Bs por 1 EUR · Valor ' + fecha : 'Bs por 1 EUR · Banco Central';
-
       let gapValue = '—';
       let gapClass = '';
       if (rates.bcv_usd && rates.binance_usd) {
@@ -710,7 +698,7 @@
             <span class="source-name">BCV Oficial</span>
           </div>
           <div class="rate-value">${rates.bcv_usd ? fmtVES(rates.bcv_usd) : '—'}</div>
-          <div class="rate-unit">${bcvUnit}</div>
+          <div class="rate-unit">Bs por 1 USD · Banco Central</div>
         </div>
 
         <div class="rate-card">
@@ -728,7 +716,7 @@
             <span class="source-name">Euro BCV</span>
           </div>
           <div class="rate-value">${rates.bcv_eur ? fmtVES(rates.bcv_eur) : '—'}</div>
-          <div class="rate-unit">${eurUnit}</div>
+          <div class="rate-unit">Bs por 1 EUR · Banco Central</div>
         </div>
 
         <div class="rate-card">
