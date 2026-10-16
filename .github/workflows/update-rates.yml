@@ -2,8 +2,16 @@ name: Actualizar Tasas BCV
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # Cada 30 minutos
+    - cron: '*/10 * * * *'  # Cada 10 minutos, todos los días
   workflow_dispatch:          # Ejecución manual
+
+permissions:
+  contents: write
+
+# Evita que dos corridas se pisen al hacer push
+concurrency:
+  group: update-rates
+  cancel-in-progress: false
 
 jobs:
   update:
@@ -13,7 +21,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Configurar Python e Instalar Librerías
+      - name: Configurar Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
@@ -24,76 +32,17 @@ jobs:
           pip install requests beautifulsoup4 urllib3
 
       - name: Scrapear BCV Directo
-        run: |
-          python3 << 'PYEOF'
-          import requests
-          from bs4 import BeautifulSoup
-          import json
-          import urllib3
-          from datetime import datetime, timezone
-
-          # Desactivar advertencias de SSL inseguro
-          urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-          url = 'https://www.bcv.org.ve/'
-          headers = {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-              'Accept-Language': 'es-ES,es;q=0.9',
-              'Cache-Control': 'no-cache',
-              'Pragma': 'no-cache'
-          }
-
-          bcv_usd = None
-          bcv_eur = None
-
-          try:
-              # Petición HTTP directa al BCV
-              response = requests.get(url, headers=headers, verify=False, timeout=25)
-              
-              if response.status_code == 200:
-                  soup = BeautifulSoup(response.content, 'html.parser')
-
-                  # Buscar contenedor del Dólar (#dolar)
-                  dolar_div = soup.find('div', id='dolar')
-                  if dolar_div:
-                      strong_usd = dolar_div.find('strong')
-                      if strong_usd:
-                          raw_val = strong_usd.text.strip()
-                          val = float(raw_val.replace('.', '').replace(',', '.'))
-                          bcv_usd = round(val, 2)
-
-                  # Buscar contenedor del Euro (#euro)
-                  euro_div = soup.find('div', id='euro')
-                  if euro_div:
-                      strong_eur = euro_div.find('strong')
-                      if strong_eur:
-                          raw_val = strong_eur.text.strip()
-                          val = float(raw_val.replace('.', '').replace(',', '.'))
-                          bcv_eur = round(val, 2)
-
-          except Exception as e:
-              print(f"Error al intentar obtener los datos del BCV: {e}")
-
-          source_status = 'bcv_direct' if bcv_usd is not None else 'error'
-
-          rates = {
-              'bcv_usd': bcv_usd,
-              'bcv_eur': bcv_eur,
-              'source': source_status,
-              'timestamp': datetime.now(timezone.utc).isoformat()
-          }
-
-          with open('rates.json', 'w') as f:
-              json.dump(rates, f, indent=2)
-
-          print(f"Resultado final -> USD: {bcv_usd}, EUR: {bcv_eur}, Estado: {source_status}")
-          PYEOF
+        run: python3 scripts/update_rates.py
 
       - name: Commit y push rates.json
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add rates.json
-          git diff --staged --quiet || git commit -m "chore: actualizar tasas BCV directo $(date -u '+%Y-%m-%d %H:%M') UTC"
+          if git diff --staged --quiet; then
+            echo "Sin cambios"
+            exit 0
+          fi
+          git commit -m "chore: actualizar tasas BCV directo $(date -u '+%Y-%m-%d %H:%M') UTC"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
           git push
