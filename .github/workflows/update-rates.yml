@@ -2,7 +2,7 @@ name: Actualizar Tasas BCV
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # Cada 30 minutos
+    - cron: '*/10 * * * *'  # Cada 10 minutos, todos los días
   workflow_dispatch:          # Ejecución manual
 
 permissions:
