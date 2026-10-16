@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-title" content="Tasas Venezuela" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" type="image/png" href="/icon-192.png" />
-  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png" />
   <title>Tasas Venezuela</title>
   <style>
     :root {
@@ -83,6 +83,7 @@
       background: var(--surface);
       border-bottom: 1px solid var(--border);
       padding: 14px 20px;
+      padding-top: calc(14px + env(safe-area-inset-top, 0px));
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -513,6 +514,15 @@
       </button>
     </div>
 
+    <div class="install-bar" id="iosBar">
+      <p>Para instalarla en tu iPhone: toca <strong>Compartir</strong>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>
+        y luego <strong>Añadir a pantalla de inicio</strong>.</p>
+      <button class="install-btn-close" id="iosClose" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
     <div class="error-banner" id="errorBanner">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <span id="errorText">No se pudo conectar. Verifica tu internet e intenta de nuevo.</span>
@@ -824,6 +834,23 @@
     document.getElementById('installClose').addEventListener('click', () => {
       document.getElementById('installBar').classList.remove('visible');
     });
+
+    // iOS no tiene beforeinstallprompt: explicar cómo instalarla (solo si no está instalada)
+    (function iosInstallHint() {
+      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const standalone = window.navigator.standalone === true ||
+        window.matchMedia('(display-mode: standalone)').matches;
+      let dismissed = false;
+      try { dismissed = localStorage.getItem('iosHintDismissed') === '1'; } catch {}
+      if (!isIOS || standalone || dismissed) return;
+      const bar = document.getElementById('iosBar');
+      bar.classList.add('visible');
+      document.getElementById('iosClose').addEventListener('click', () => {
+        bar.classList.remove('visible');
+        try { localStorage.setItem('iosHintDismissed', '1'); } catch {}
+      });
+    })();
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
