@@ -1,6 +1,6 @@
 // Cambia este número cuando quieras forzar a todos a descargar los estáticos de nuevo
-const CACHE = 'tasasve-v2';
-const STATIC = ['/', '/index.html', '/manifest.json', '/icon-192.png', '/icon-512.png'];
+const CACHE = 'tasasve-v3';
+const STATIC = ['/', '/index.html', '/manifest.json', '/icon-180.png', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)).then(() => self.skipWaiting()));
