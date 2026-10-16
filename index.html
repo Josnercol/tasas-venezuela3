@@ -394,6 +394,7 @@
     }
 
     .convert-row { cursor: pointer; }
+    .row-sub { display: block; font-size: 11px; font-weight: 500; color: var(--text3); }
     .convert-row:active { background: var(--surface2); }
 
     .convert-row .value {
@@ -573,9 +574,8 @@
         </div>
 
         <div class="calc-toggle-row" role="group" aria-label="Moneda de entrada">
-          <button type="button" class="toggle-btn active" data-currency="USD" onclick="setInputCurrency('USD')">USD $</button>
-          <button type="button" class="toggle-btn" data-currency="EUR" onclick="setInputCurrency('EUR')">EUR €</button>
-          <button type="button" class="toggle-btn" data-currency="VES" onclick="setInputCurrency('VES')">VES Bs</button>
+          <button type="button" class="toggle-btn active" data-currency="USD" onclick="setInputCurrency('USD')">$ / € → Bs</button>
+          <button type="button" class="toggle-btn" data-currency="VES" onclick="setInputCurrency('VES')">Bs → $ / €</button>
         </div>
 
         <input class="field-input" type="text" id="calcAmount" value="1" inputmode="decimal" autocomplete="off" oninput="convert()" placeholder="0" aria-label="Monto a convertir" />
@@ -765,16 +765,15 @@
       let rowsHtml = '';
 
       if (inputCurrency === 'USD') {
+        // Cada fila convierte su propia moneda: el monto en $ o en €, según la fila
+        const amt = nf2.format(amount);
         if (rates.bcv_usd)
-          rowsHtml += row('#f59e0b', 'Dólar BCV',   'Bs. ' + nf2.format(amount * rates.bcv_usd));
+          rowsHtml += row('#f59e0b', 'Dólar BCV',   'Bs. ' + nf2.format(amount * rates.bcv_usd), '$' + amt);
         if (rates.binance_usd)
-          rowsHtml += row('#f0b90b', 'Binance P2P', 'Bs. ' + nf2.format(amount * rates.binance_usd));
-        note.textContent = nf2.format(amount) + ' USD en bolívares · Solo referencial';
-
-      } else if (inputCurrency === 'EUR') {
+          rowsHtml += row('#f0b90b', 'Binance P2P', 'Bs. ' + nf2.format(amount * rates.binance_usd), amt + ' USDT');
         if (rates.bcv_eur)
-          rowsHtml += row('#3b82f6', 'Euro BCV',    'Bs. ' + nf2.format(amount * rates.bcv_eur));
-        note.textContent = nf2.format(amount) + ' EUR en bolívares · Solo referencial';
+          rowsHtml += row('#3b82f6', 'Euro BCV',    'Bs. ' + nf2.format(amount * rates.bcv_eur), '€' + amt);
+        note.textContent = 'Divisas a bolívares · Solo referencial';
 
       } else { // VES
         if (rates.bcv_usd)
@@ -783,16 +782,16 @@
           rowsHtml += row('#f0b90b', 'Binance P2P', '$ '   + nf2.format(amount / rates.binance_usd));
         if (rates.bcv_eur)
           rowsHtml += row('#3b82f6', 'Euro BCV',    '€ '   + nf2.format(amount / rates.bcv_eur));
-        note.textContent = nf2.format(amount) + ' Bs. en divisas · Solo referencial';
+        note.textContent = 'Bs. ' + nf2.format(amount) + ' en divisas · Solo referencial';
       }
 
       resultsEl.innerHTML = rowsHtml;
     }
 
-    function row(dot, label, value) {
+    function row(dot, label, value, sub) {
       return `
         <div class="convert-row" onclick="copyValue(this)" title="Toca para copiar">
-          <span class="source"><span class="source-dot" style="background:${dot}"></span>${label}</span>
+          <span class="source"><span class="source-dot" style="background:${dot}"></span><span>${label}${sub ? `<span class="row-sub">${sub}</span>` : ''}</span></span>
           <span class="value">${value}</span>
         </div>`;
     }
